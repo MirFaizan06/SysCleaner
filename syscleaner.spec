@@ -1,0 +1,77 @@
+# -*- mode: python ; coding: utf-8 -*-
+# PyInstaller spec for SysCleaner — Tech Bytes Design
+# Build: pyinstaller syscleaner.spec --noconfirm
+
+a = Analysis(
+    ['main.py'],
+    pathex=[],
+    binaries=[],
+    datas=[
+        ('CLAUDE.md', '.'),
+    ],
+    hiddenimports=[
+        'rich',
+        'rich.console',
+        'rich.table',
+        'rich.panel',
+        'rich.progress',
+        'rich.prompt',
+        'rich.rule',
+        'rich.text',
+        'psutil',
+        'psutil._pswindows',
+        'winreg',
+        'ctypes',
+        'ctypes.wintypes',
+        'xml.etree.ElementTree',
+        'modules.cleaner',
+        'modules.network',
+        'modules.memory',
+        'modules.sysinfo',
+        'modules.logs',
+        'modules.threats',
+        'modules.tips',
+        'modules.utils',
+        'modules.logger',
+    ],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[
+        'tkinter',
+        'matplotlib',
+        'numpy',
+        'scipy',
+        'pandas',
+        'PIL',
+        'IPython',
+        'jupyter',
+    ],
+    noarchive=False,
+)
+
+pyz = PYZ(a.pure)
+
+exe = EXE(
+    pyz,
+    a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    [],
+    name='SysCleaner',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    runtime_tmpdir=None,
+    console=True,
+    disable_windowed_traceback=False,
+    uac_admin=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon='syscleaner.ico',
+    version='version_info.txt',
+)
