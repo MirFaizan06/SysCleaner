@@ -2,10 +2,11 @@
 ; Compile with: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" syscleaner.iss
 
 #define AppName        "SysCleaner"
-#define AppVersion     "1.0.0"
+#define AppVersion     "1.1.0"
 #define AppPublisher   "Tech Bytes Design"
 #define AppURL         "https://techbytesdesign.in"
 #define AppExeName     "SysCleaner.exe"
+#define AppCmdName     "sysc.cmd"
 
 [Setup]
 AppId={{8A5F2C1D-3B6E-4F9A-B2C7-D8E1F5A4B3C2}
@@ -51,10 +52,14 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "desktopicon";    Description: "Create a &desktop shortcut";    GroupDescription: "Additional icons:"
 Name: "startmenuicon";  Description: "Create a &Start Menu entry";    GroupDescription: "Additional icons:"; Flags: checkedonce
+Name: "addtopath";      Description: "Add 'sysc' command to &PATH (recommended)"; GroupDescription: "Command-line access:"; Flags: checkedonce
 
 [Files]
 ; Main executable (built by PyInstaller)
 Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+
+; sysc command-line wrapper
+Source: "sysc.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 ; AI agent documentation
 Source: "CLAUDE.md"; DestDir: "{app}"; Flags: ignoreversion
@@ -70,6 +75,11 @@ Name: "{group}\Uninstall {#AppName}";               Filename: "{uninstallexe}"; 
 ; Desktop
 Name: "{autodesktop}\{#AppName}";                   Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 
+[Registry]
+; Add install directory to current user's PATH so 'sysc' works from any terminal
+; Uses a Pascal code check (NeedsAddPath) to avoid duplicating the entry
+Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}"; Check: NeedsAddPath(ExpandConstant('{app}')); Tasks: addtopath; Flags: preservestringtype uninsdeletevalue
+
 [Run]
 ; Offer to launch after install
 Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName} now"; Flags: nowait postinstall skipifsilent
@@ -79,12 +89,34 @@ Filename: "{app}\{#AppExeName}"; Description: "Launch {#AppName} now"; Flags: no
 Type: filesandordirs; Name: "{app}"
 
 [Code]
-// Show a friendly note about Administrator mode during install
+// ── NeedsAddPath ──────────────────────────────────────────────────────────────
+// Returns True if Dir is not already present in the PATH environment variable.
+function NeedsAddPath(Dir: string): Boolean;
+var
+  OrigPath: string;
+  ExpandedDir: string;
+begin
+  ExpandedDir := Lowercase(Dir);
+  if not RegQueryStringValue(HKEY_CURRENT_USER, 'Environment', 'Path', OrigPath) then
+  begin
+    // PATH key doesn't exist yet — safe to add
+    Result := True;
+    Exit;
+  end;
+  Result := Pos(';' + ExpandedDir + ';', ';' + Lowercase(OrigPath) + ';') = 0;
+end;
+
+// ── Welcome page tip ──────────────────────────────────────────────────────────
 procedure InitializeWizard;
 begin
   WizardForm.WelcomeLabel2.Caption :=
-    WizardForm.WelcomeLabel2.Caption + #13#10 +
-    'Tip: For full functionality (system-level cleaning, ' +
-    'Winsock reset, RAM optimization), right-click SysCleaner.exe ' +
-    'and choose "Run as administrator".';
+    WizardForm.WelcomeLabel2.Caption + #13#10 + #13#10 +
+    'What''s new in v1.1.0:' + #13#10 +
+    '  · Disk Analyzer — see what''s using your space' + #13#10 +
+    '  · Startup Manager — view and disable startup entries' + #13#10 +
+    '  · HTML Report — full system snapshot saved to Documents' + #13#10 +
+    '  · sysc command — run from any terminal (sysc info, sysc clean...)' + #13#10 + #13#10 +
+    'Tip: For full functionality (deep cleaning, Winsock reset, RAM ' +
+    'optimization), right-click SysCleaner.exe and choose ' +
+    '"Run as administrator".';
 end;
