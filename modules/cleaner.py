@@ -239,7 +239,7 @@ def run(console: Console, is_admin: bool = False, auto_confirm: bool = False) ->
     results: list[tuple[_Target, int, int, bool]] = []  # (target, bytes, files, skipped)
 
     with Progress(SpinnerColumn(), TextColumn("[cyan]{task.description}"),
-                  console=console, transient=True) as prog:
+                  console=console, transient=False) as prog:
         task = prog.add_task("Scanning…", total=len(targets))
         for t in targets:
             prog.update(task, description=f"Scanning  {t.name}")
@@ -254,6 +254,7 @@ def run(console: Console, is_admin: bool = False, auto_confirm: bool = False) ->
             if size > 0 or count > 0:
                 results.append((t, size, count, False))
             prog.advance(task)
+    console.print()
 
     if not results:
         console.print("[dim]  Nothing found to clean.[/]\n")

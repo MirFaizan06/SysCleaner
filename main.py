@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import json
+import os
 import sys
 
 import psutil
@@ -21,16 +22,23 @@ from modules.logger import install_exception_hook, log_info, log_error, setup as
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.columns import Columns
-from rich.prompt import Prompt
 from rich.text import Text
 from rich.rule import Rule
+from rich.prompt import Prompt
 from rich import box
+
+# Force UTF-8 so Unicode box-drawing / star chars work on any Windows terminal
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except AttributeError:
+    pass
 
 APP_NAME    = "SysCleaner"
 APP_VERSION = "1.0.0"
 COMPANY     = "Tech Bytes Design"
 WEBSITE     = "techbytesdesign.in"
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,6 +49,11 @@ def _is_admin() -> bool:
         return False
 
 
+def _cls() -> None:
+    """Hard Windows terminal clear — avoids ANSI cursor-movement artifacts."""
+    os.system("cls")
+
+
 def _pct_color(pct: float, warn: float = 70, crit: float = 85) -> str:
     if pct >= crit:  return "red"
     if pct >= warn:  return "yellow"
@@ -49,18 +62,21 @@ def _pct_color(pct: float, warn: float = 70, crit: float = 85) -> str:
 
 def _quick_stats() -> str:
     try:
-        cpu = psutil.cpu_percent(interval=0.3)
+        cpu = psutil.cpu_percent(interval=0.25)
         vm  = psutil.virtual_memory()
         cc  = _pct_color(cpu, 50, 85)
         rc  = _pct_color(vm.percent)
-        disk_part = ""
+        parts = [
+            f"CPU [{cc}]{cpu:.0f}%[/]",
+            f"RAM [{rc}]{vm.percent:.0f}%[/]",
+        ]
         try:
             u  = psutil.disk_usage("C:\\")
             dc = _pct_color(u.percent)
-            disk_part = f"  [dim]│[/]  C:\\ [{dc}]{u.percent:.0f}%[/]"
+            parts.append(f"C:\\ [{dc}]{u.percent:.0f}%[/]")
         except Exception:
             pass
-        return f"CPU [{cc}]{cpu:.0f}%[/]  RAM [{rc}]{vm.percent:.0f}%[/]{disk_part}"
+        return "  ·  ".join(parts)
     except Exception:
         return ""
 
@@ -68,75 +84,82 @@ def _quick_stats() -> str:
 # ── Header ────────────────────────────────────────────────────────────────────
 
 def _show_header(console: Console, is_admin: bool) -> None:
-    admin_txt = "[bold green]● ADMIN[/]" if is_admin else "[bold yellow]● USER[/]"
     stats     = _quick_stats()
+    mode_tag  = "[bold green]● ADMIN[/]" if is_admin else "[bold yellow]● USER[/]"
 
-    grid = Table.grid(expand=True, padding=(0, 1))
+    grid = Table.grid(padding=(0, 1), expand=True)
     grid.add_column(ratio=1)
     grid.add_column(justify="right")
 
     grid.add_row(
         Text.from_markup(f"[bold cyan]{APP_NAME}[/]  [dim]Windows System Utility[/]"),
-        Text.from_markup(f"[dim]{COMPANY}[/]  [bold]v{APP_VERSION}[/]"),
+        Text.from_markup(f"[dim]{COMPANY}[/]  [dim]v{APP_VERSION}[/]"),
     )
     grid.add_row(
-        Text.from_markup(f"{admin_txt}  [dim]│[/]  {stats}"),
+        Text.from_markup(f"{mode_tag}  [dim]{stats}[/]"),
         Text.from_markup(f"[dim]{WEBSITE}[/]"),
     )
 
-    console.print(Panel(grid, box=box.DOUBLE_EDGE, border_style="cyan", padding=(0, 2)))
-    console.print()
+    console.print(Panel(grid, border_style="cyan", box=box.HEAVY, padding=(0, 2)))
 
 
 # ── Menu ──────────────────────────────────────────────────────────────────────
 
-_MENU_GROUPS = [
+_GROUPS = [
     ("MAINTENANCE", [
-        ("1", "clean",   "Clean Caches & Temp Files",  "Browser · dev tools · Windows temp"),
-        ("2", "network", "Refresh Network",             "DNS flush · Winsock reset · adapters"),
-        ("3", "ram",     "Optimize RAM",                "Live stats · standby memory purge"),
+        ("1", "clean",   "Clean Caches & Temp Files",  "browser · dev tools · windows temp"),
+        ("2", "network", "Refresh Network",             "DNS flush · winsock reset · adapters"),
+        ("3", "ram",     "Optimize RAM",                "live stats · standby memory purge"),
     ]),
     ("DIAGNOSTICS", [
         ("4", "info",    "System Information",          "CPU · RAM · disk · OS · uptime"),
-        ("5", "logs",    "View Error Logs",             "Last 10 critical/error/warning events"),
-        ("6", "threats", "Threat Scan",                 "Processes · startup · hosts · ports"),
-        ("7", "tips",    "Tips & Recommendations",      "Smart advice based on your system"),
+        ("5", "logs",    "View Error Logs",             "last 10 critical/error/warning events"),
+        ("6", "threats", "Threat Scan",                 "processes · startup · hosts · ports"),
+        ("7", "tips",    "Tips & Recommendations",      "smart advice based on your system"),
     ]),
-    ("", [
-        ("8", "all",  "★  Full System Report", "Run all modules in sequence"),
-        ("0", "exit", "✕  Exit",               ""),
-    ]),
+]
+_EXTRA = [
+    ("8", "all",  "★  Full System Report", "run all modules in sequence"),
+    ("0", "exit", "✕  Exit",               ""),
 ]
 
 
 def _show_menu(console: Console) -> None:
-    tbl = Table(box=box.ROUNDED, border_style="dim cyan",
-                show_header=False, padding=(0, 2), expand=False)
-    tbl.add_column("Key",   style="bold cyan", width=4)
-    tbl.add_column("Name",  style="bold",      width=30)
-    tbl.add_column("Desc",  style="dim",       width=40)
-
-    for group_name, items in _MENU_GROUPS:
-        if group_name:
-            tbl.add_row("", f"[dim]{group_name}[/]", "", style="dim")
+    console.print()
+    for group_name, items in _GROUPS:
+        console.print(f"  [bold dim]{group_name}[/]")
+        console.print(f"  [dim]{'─' * 62}[/]")
         for key, _, name, desc in items:
-            if key == "0":
-                tbl.add_row(f"[red]{key}[/]", f"[red]{name}[/]", desc)
-            elif key == "8":
-                tbl.add_row(f"[bold yellow]{key}[/]", f"[bold yellow]{name}[/]", desc)
-            else:
-                tbl.add_row(key, name, desc)
+            key_txt  = Text(f" {key} ", style="bold cyan on #0d1620")
+            name_txt = Text(f"  {name:<30}", style="bold white")
+            desc_txt = Text(f"  {desc}", style="dim")
+            row = Text.assemble(key_txt, name_txt, desc_txt)
+            console.print(f"  {row}")
+        console.print()
 
-    console.print(tbl)
+    console.print(f"  [dim]{'─' * 62}[/]")
+    for key, _, name, desc in _EXTRA:
+        if key == "8":
+            key_s  = f"[bold yellow] {key} [/]"
+            name_s = f"[bold yellow]  {name:<30}[/]"
+        else:
+            key_s  = f"[bold red] {key} [/]"
+            name_s = f"[bold red]  {name:<30}[/]"
+        desc_s = f"[dim]  {desc}[/]" if desc else ""
+        console.print(f"  {key_s}{name_s}{desc_s}")
     console.print()
 
 
 def _all_keys() -> list[str]:
-    return [item[0] for group in _MENU_GROUPS for item in group[1]]
+    keys = [i[0] for _, items in _GROUPS for i in items]
+    keys += [i[0] for i in _EXTRA]
+    return keys
 
 
 def _key_to_cmd() -> dict[str, str]:
-    return {item[0]: item[1] for group in _MENU_GROUPS for item in group[1]}
+    m = {i[0]: i[1] for _, items in _GROUPS for i in items}
+    m.update({i[0]: i[1] for i in _EXTRA})
+    return m
 
 
 # ── Module runner ─────────────────────────────────────────────────────────────
@@ -146,17 +169,9 @@ def _import_mods():
     return cleaner, network, memory, sysinfo, logs, threats, tips
 
 
-def _run_cmd(
-    cmd: str,
-    console: Console,
-    is_admin: bool,
-    auto_confirm: bool,
-    mods,
-) -> None:
+def _run_cmd(cmd: str, console: Console, is_admin: bool, auto_confirm: bool, mods) -> None:
     cl, net, mem, si, lg, thr, tip = mods
-
     ORDER = ["info", "clean", "network", "ram", "logs", "threats", "tips"]
-
     dispatch = {
         "clean":   lambda: cl.run(console,  is_admin, auto_confirm),
         "network": lambda: net.run(console, is_admin, auto_confirm),
@@ -166,7 +181,6 @@ def _run_cmd(
         "threats": lambda: thr.run(console, is_admin, auto_confirm),
         "tips":    lambda: tip.run(console, is_admin, auto_confirm),
     }
-
     if cmd == "all":
         for key in ORDER:
             console.print(Rule(style="dim cyan"))
@@ -183,7 +197,7 @@ def _interactive(console: Console, is_admin: bool) -> None:
     choices = _all_keys()
 
     while True:
-        console.clear()
+        _cls()
         _show_header(console, is_admin)
         _show_menu(console)
 
@@ -195,19 +209,22 @@ def _interactive(console: Console, is_admin: bool) -> None:
         )
 
         if choice == "0":
+            _cls()
             console.print(
-                f"\n  [bold cyan]Stay clean. Stay fast. — {COMPANY}[/]\n"
+                f"\n  [bold cyan]Stay clean. Stay fast.[/]  [dim]— {COMPANY}[/]\n"
             )
             break
 
         cmd = k2c[choice]
-        console.clear()
+        _cls()
         _show_header(console, is_admin)
+        console.print()
 
         try:
             _run_cmd(cmd, console, is_admin, auto_confirm=False, mods=mods)
         except Exception as exc:
-            console.print(f"  [red]Error:[/] {exc}")
+            console.print(f"\n  [red]Error:[/] {exc}")
+            log_error(str(exc), module=cmd, exc=exc)
 
         Prompt.ask("\n  [dim]Press Enter to return to menu[/]", default="")
 
@@ -245,10 +262,12 @@ def _agent(commands: list[str], is_admin: bool, json_mode: bool, auto_confirm: b
     if "all" in commands:
         commands = ["info", "clean", "network", "ram", "logs", "threats", "tips"]
     for cmd in commands:
+        console.print()
         try:
             _run_cmd(cmd, console, is_admin, auto_confirm, mods)
         except Exception as exc:
             console.print(f"  [red]Error running '{cmd}':[/] {exc}")
+            log_error(str(exc), module=cmd, exc=exc)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -279,7 +298,6 @@ def main() -> None:
     args     = parser.parse_args()
     is_admin = _is_admin()
 
-    # Initialise logger and install crash hook on every run
     _setup_logger()
     install_exception_hook()
     log_info(f"Session start  admin={is_admin}  args={args.commands}", module="main")
