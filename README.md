@@ -19,7 +19,7 @@ A professional, minimal, and powerful Windows cleaner and health tool built for 
 | **Error Logs** | Last 10 Critical/Error/Warning entries from Windows System and Application event logs |
 | **Threat Scan** | Checks running processes against known-bad names, lists startup programs, inspects hosts file, flags suspicious listening ports |
 | **Smart Tips** | Contextual recommendations based on disk usage, RAM load, uptime, temp folder size, CPU load, and battery |
-| **HTML Report** | Generates a beautiful, self-contained HTML system report saved to `~/Documents/SysCleaner Reports/` — opens automatically in your browser |
+| **HTML Report** | Generates a chart-rich, self-contained HTML system report saved to `~/Documents/SysCleaner Reports/` — opens automatically in your browser; includes Chart.js gauges and bar charts |
 
 ---
 
@@ -139,7 +139,7 @@ Run `sysc report` (or press **R** in the menu) to generate a complete, self-cont
 - All startup programs (enabled/disabled)
 - Smart recommendations
 
-Saved to `~/Documents/SysCleaner Reports/`. Opens automatically in your default browser. Supports light and dark mode.
+Saved to `~/Documents/SysCleaner Reports/`. Opens automatically in your default browser. Supports light and dark mode. Charts (Chart.js) require an internet connection to render; the rest of the report is fully offline.
 
 ---
 
@@ -224,7 +224,7 @@ Scans common directories (Downloads, Documents, Videos, AppData, Program Files, 
 Lists all programs configured to launch at Windows startup — from both the registry (`HKCU` and `HKLM` Run keys) and the Startup folder. Lets you toggle entries on or off with a single keypress. Disabling is safe and reversible: it only renames the registry value (adds a `DISABLED_` prefix) and never deletes anything.
 
 ### HTML System Report
-Generates a beautiful, fully self-contained HTML file saved to `~/Documents/SysCleaner Reports/`. The report includes: system overview cards (CPU, RAM, uptime, battery), drive usage with progress bars, threat scan summary, Windows event log entries, startup program list, and smart recommendations. Supports light and dark mode automatically. No internet connection required to view it.
+Generates a chart-rich, self-contained HTML file saved to `~/Documents/SysCleaner Reports/`. The report includes: interactive half-gauge charts for CPU and RAM usage (Chart.js), doughnut charts for each drive, a horizontal bar chart for top folders by size, threat scan summary, Windows event log entries, startup program list, and smart recommendations. Supports light and dark mode automatically. Charts require an internet connection (Chart.js CDN); all other report content renders offline.
 
 ### System Information
 Shows a complete snapshot: CPU model, physical and logical core count, current clock speed and load percentage; RAM totals; all mounted disks with free space and usage percent; OS edition and Windows build number; system uptime; and battery status if applicable.
